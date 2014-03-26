@@ -159,7 +159,7 @@ func setTimeout(duration int) {
 	}()
 	go func() {
 		<-timeout
-		//signal would be sent to signalChannel and printResults would be called
+		//signal would be sent to signalChannel and report() would be called
 		syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
 	}()
 }

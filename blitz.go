@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/saj1th/blitz/src/blitzkrieg"
+	"github.com/HiFX/blitz/blitzkrieg"
 )
 
 // Runs the Load Test
