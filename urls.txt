@@ -1,0 +1,4 @@
+http://localhost:8080/post/	POST	var1=val&var2=2&var3=3	-H 'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' -H 'Cookie: KEY1=val1; KEY2=val2;' -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.9; rv:27.0) Gecko/20100101 Firefox/27.0'
+http://localhost:8080/	GET	-H 'Cookie: M=d5dss5p98cn9d'
+http://localhost:8080/
+http://localhost:8080/post/	POST	var4=val
