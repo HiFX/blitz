@@ -1,13 +1,13 @@
 package blitzkrieg
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/bmizerany/perks/quantile"
+	"sort"
 	"text/tabwriter"
 	"time"
-
-	"bytes"
-	"sort"
+	"strconv"
 )
 
 // A blitzResult represents the result of an http Request
@@ -16,7 +16,20 @@ type blitzResult struct {
 	statusCode    int
 	duration      time.Duration
 	contentLength int64
+	timestamp     time.Time
 }
+
+type plot struct {
+	elapsed        float64
+	latencySuccess string
+	latencyErr     string
+}
+
+type graphPlots []*plot
+
+func (gp graphPlots) Len() int { return len(gp) }
+func (gp graphPlots) Swap(i, j int) { gp[i], gp[j] = gp[j], gp[i] }
+func (gp graphPlots) Less(i, j int) bool { return gp[i].elapsed < gp[j].elapsed }
 
 // report represents the results of the load test
 type report struct {
@@ -34,44 +47,57 @@ type report struct {
 	totalSuccess    int64
 	totalHttpErrors int64
 	rate            float64
+	graphData       graphPlots
 }
 
 func (blitz *Blitz) report() {
 	fmt.Println("\nPreparing report...")
-	report := &report{statusCodes: make(map[int]int), errors: make(map[string]int)}
+	report := &report{statusCodes: make(map[int]int), errors: make(map[string]int), graphData: make([]*plot, 0)}
 	quants := quantile.NewTargeted(0.50, 0.99)
-	var duration float64
+	var (
+		duration float64
+		diff     float64
+		data     *plot
+	)
 	for {
 		select {
 		case results := <-blitz.results:
-			for _, result := range results {
-				report.totalRequests++
-				duration = result.duration.Seconds()
-				if result.err != nil {
-					report.errors[result.err.Error()]++
-					report.totalHttpErrors++
+		for _, result := range *results {
+			diff = result.timestamp.Sub(blitz.startTime).Seconds()
+			report.totalRequests++
+			duration = result.duration.Seconds()
+			if result.err != nil {
+				report.errors[result.err.Error()]++
+				report.totalHttpErrors++
+				data = &plot{elapsed: diff, latencySuccess: "0", latencyErr: strconv.FormatFloat(duration, 'f', 5, 64)}
+
+			} else {
+				report.statusCodes[result.statusCode]++
+				if result.statusCode >= 200 && result.statusCode <= 300 {
+					report.totalSuccess++
+					data = &plot{elapsed: diff, latencySuccess: strconv.FormatFloat(duration, 'f', 4, 64), latencyErr: "0"}
 				} else {
-					report.statusCodes[result.statusCode]++
-					if result.statusCode >= 200 && result.statusCode <= 300 {
-						report.totalSuccess++
-					}
-					report.latencies = append(report.latencies, duration)
-					report.totalTimeSum += duration
-					if result.contentLength > 0 {
-						report.totalSize += result.contentLength
-					}
-					if duration > report.maxLat {
-						report.maxLat = duration
-					}
-					quants.Insert(duration)
+					data = &plot{elapsed: diff, latencySuccess: "0", latencyErr: strconv.FormatFloat(duration, 'f', 5, 64)}
 				}
+				report.latencies = append(report.latencies, duration)
+				report.totalTimeSum += duration
+				if result.contentLength > 0 {
+					report.totalSize += result.contentLength
+				}
+				if duration > report.maxLat {
+					report.maxLat = duration
+				}
+				quants.Insert(duration)
 			}
+			report.graphData = append(report.graphData, data)
+			//data = []string{strconv.FormatFloat(diff, 'f', 4, 64), strconv.FormatFloat(duration, 'f', 4, 64), "0"}
+		}
 		default:
 			report.totalTime = time.Now().Sub(blitz.startTime).Seconds()
 			report.percentile50Lat = quants.Query(0.50)
 			report.percentile99Lat = quants.Query(0.99)
 			if report.totalTimeSum > 0 {
-				report.avgLat = report.totalTimeSum / float64(len(report.latencies))
+				report.avgLat = report.totalTimeSum/float64(len(report.latencies))
 			}
 			print(report)
 			return
@@ -110,18 +136,15 @@ func print(report *report) {
 		}
 	}
 	tabw.Flush()
-	fmt.Println(out.String())
+	outStr := out.String()
+	fmt.Println(outStr)
 
 	switch outFormat {
 	case "graph":
-		graph(report)
+		graph(report, outStr)
 	case "csv":
 		csv(report)
 	}
-}
-
-func graph(report *report) {
-	fmt.Println("graph to be written")
 }
 
 func csv(report *report) {

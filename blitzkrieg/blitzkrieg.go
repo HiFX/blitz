@@ -17,25 +17,25 @@ import (
 
 // A Blitz contains all the vars to perform the load test
 type Blitz struct {
-	requests       []*blitzRequest     // generated from URL/URLs file
-	loginRequest   *blitzRequest       //Login Request
-	count          int                 //Number of requests
-	clients        int                 //The number of concurrent clients to run
-	duration       int                 // Duration to run the test
-	keepAlive      bool                //Whether to set KeepAlive ON or NOT
-	connectTimeout int                 //Connect timeout in ms
-	rate           int                 // Rate limit.
-	header         http.Header         // Http Headers
-	startTime      time.Time           // Start time
-	bar            *pb.ProgressBar     // Progress bar
-	jobs           chan *blitzRequest  //Jobs channel
-	results        chan []*blitzResult //Results Channel holds array of blitzResult (size blitz.clients)
+	requests       []*blitzRequest      // generated from URL/URLs file
+	loginRequest   *blitzRequest        //Login Request
+	count          int                  //Number of requests
+	clients        int                  //The number of concurrent clients to run
+	duration       int                  // Duration to run the test
+	keepAlive      bool                 //Whether to set KeepAlive ON or NOT
+	connectTimeout int                  //Connect timeout in ms
+	rate           int                  // Rate limit.
+	header         http.Header          // Http Headers
+	startTime      time.Time            // Start time
+	bar            *pb.ProgressBar      // Progress bar
+	jobs           chan *blitzRequest   //Jobs channel
+	results        chan *[]*blitzResult //Results Channel holds array of blitzResult (size blitz.clients)
 }
 
 // Run sets up the variables and runs the load test
 func (blitz *Blitz) Run() {
 	//Results channel
-	blitz.results = make(chan []*blitzResult, blitz.clients)
+	blitz.results = make(chan *[]*blitzResult, blitz.clients)
 	if blitz.duration != 0 { // test to be run for blitz.duration seconds
 		setTimeout(blitz.duration)
 		blitz.bar = newPBar(blitz.duration)
@@ -86,6 +86,7 @@ func (blitz *Blitz) run() {
 
 func (blitz *Blitz) raider() {
 	result := make([]*blitzResult, 0)
+	blitz.results <- &result
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
@@ -114,12 +115,13 @@ func (blitz *Blitz) raider() {
 			duration:      time.Now().Sub(s),
 			err:           err,
 			contentLength: size,
+			timestamp:     time.Now(),
 		})
 		if blitz.duration == 0 {
 			blitz.bar.Increment()
 		}
 	}
-	blitz.results <- result
+
 }
 
 func (blitz *Blitz) handleInterrupts() {
@@ -128,6 +130,7 @@ func (blitz *Blitz) handleInterrupts() {
 	go func() {
 		_ = <-signalChannel
 		blitz.jobs = nil
+		blitz.bar.Finish()
 		blitz.report()
 		os.Exit(0)
 	}()
@@ -139,7 +142,6 @@ func (blitz *Blitz) showDurationPBar() {
 		blitz.bar.Increment()
 		<-ticker
 	}
-	fmt.Println("test")
 }
 
 func newPBar(size int) (bar *pb.ProgressBar) {
