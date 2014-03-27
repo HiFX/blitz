@@ -122,7 +122,7 @@ func NewBlitz() (blitz *Blitz) {
 	}
 	blitz = &Blitz{
 		requests:       make([]*blitzRequest, 0),
-		count:          math.MaxUint32,
+		count:          math.MaxInt32,
 		clients:        clients,
 		rate:           rate,
 		connectTimeout: connectTimeout,
