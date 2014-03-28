@@ -28,10 +28,11 @@ var (
 	url            string // URL
 	urlsFilePath   string // Input file containing Urls
 	keepAlive      bool   // Http Keep-alive on/off flag
+	gzip           bool   // Accept gzip compression
 	needLogin      bool   // Login on/off flag - if enabled the first url from urlsFilePath is used for login
 	connectTimeout int    // Connect timeout in milliseconds
-	readTimeout	   int	  // Read timeout in milliseconds
-	writeTimeout   int	  // Write timeout in milliseconds
+	readTimeout    int    // Read timeout in milliseconds
+	writeTimeout   int    // Write timeout in milliseconds
 	showErr        bool   // Show errors
 	outFormat      string // Output Format
 	version        bool   // Display version
@@ -66,15 +67,17 @@ func init() {
 	flag.StringVar(&urlsFilePath, "file", "", "")
 	flag.BoolVar(&keepAlive, "k", true, "Do keep HTTP keep-alive on")
 	flag.BoolVar(&keepAlive, "keep", true, "")
+	flag.BoolVar(&gzip, "g", true, "Accept Gzip")
+	flag.BoolVar(&gzip, "gzip", true, "")
 	flag.BoolVar(&needLogin, "l", false, "Login on/off flag")
 	flag.BoolVar(&needLogin, "login", false, "")
 	flag.BoolVar(&showErr, "e", false, "")
 	flag.BoolVar(&showErr, "err", false, "Display Errors")
 	flag.IntVar(&connectTimeout, "tc", 5000, "Connect timeout in ms")
 	flag.IntVar(&connectTimeout, "timeoutcon", 5000, "")
-	flag.IntVar(&readTimeout, "tr", 5000, "Connect timeout in ms")
+	flag.IntVar(&readTimeout, "tr", 5000, "Read timeout in ms")
 	flag.IntVar(&readTimeout, "timeoutread", 5000, "")
-	flag.IntVar(&writeTimeout, "tw", 5000, "Connect timeout in ms")
+	flag.IntVar(&writeTimeout, "tw", 5000, "Write timeout in ms")
 	flag.IntVar(&writeTimeout, "timeoutwrite", 5000, "")
 	flag.StringVar(&outFormat, "o", "", "")
 	flag.StringVar(&outFormat, "output", "", "Output Format")
@@ -91,6 +94,7 @@ func init() {
 		fmt.Fprintf(os.Stderr, "-u,  -url            URL               URL to test.\n")
 		fmt.Fprintf(os.Stderr, "-f,  -file           URLs File         URLs file.\n")
 		fmt.Fprintf(os.Stderr, "-k,  -keep           KeepAlive         HTTP keep-alive on/off [default true].\n")
+		fmt.Fprintf(os.Stderr, "-g,  -gzip           GZip              Accept Gzip Compression [default true].\n")
 		fmt.Fprintf(os.Stderr, "-l,  -login          Login             Do login on/off.\n")
 		fmt.Fprintf(os.Stderr, "-tc, -timeoutcon     ConnectTimeout    Connect timeout in ms [default 5000].\n")
 		fmt.Fprintf(os.Stderr, "-tr, -timeoutread    ReadTimeout       Read timeout in ms [default 5000].\n")
@@ -133,15 +137,14 @@ func NewBlitz() (blitz *Blitz) {
 		count:          math.MaxInt32,
 		clients:        clients,
 		rate:           rate,
+		keepAlive:      keepAlive,
+		gzip:           gzip,
 		connectTimeout: connectTimeout,
-		readTimeout: readTimeout,
-		writeTimeout: writeTimeout,
+		readTimeout:    readTimeout,
+		writeTimeout:   writeTimeout,
 	}
 	if count != -1 {
 		blitz.count = count
-	}
-	if keepAlive {
-		blitz.keepAlive = true
 	}
 
 	if urlsFilePath != "" {

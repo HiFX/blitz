@@ -22,6 +22,7 @@ type Blitz struct {
 	clients        int                  //The number of concurrent clients to run
 	duration       int                  // Duration to run the test
 	keepAlive      bool                 //Whether to set KeepAlive ON or NOT
+	gzip           bool                 //Whether to enable gzip or not
 	connectTimeout int                  //Connect timeout in ms
 	readTimeout    int                  //Read timeout in ms
 	writeTimeout   int                  //Write timeout in ms
@@ -32,7 +33,6 @@ type Blitz struct {
 	jobs           chan *blitzRequest   //Jobs channel
 	results        chan *[]*blitzResult //Results Channel holds array of blitzResult (size blitz.clients)
 }
-
 
 type BlitzConn struct {
 	net.Conn
@@ -79,7 +79,7 @@ func (blitz *Blitz) run() {
 	// Throttle the rate at which requests are sent in the job channel if Rate limiting is applicable
 	var throttler <-chan time.Time
 	if blitz.rate > 0 {
-		throttler = time.Tick(time.Duration(1e6/(blitz.rate))*time.Microsecond)
+		throttler = time.Tick(time.Duration(1e6/(blitz.rate)) * time.Microsecond)
 	}
 	blitz.startTime = time.Now()
 	var waitr sync.WaitGroup
@@ -112,17 +112,19 @@ func (blitz *Blitz) raider() {
 	result := make([]*blitzResult, 0)
 	blitz.results <- &result
 	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		TLSClientConfig:    &tls.Config{InsecureSkipVerify: true},
+		DisableKeepAlives:  !blitz.keepAlive,
+		DisableCompression: !blitz.gzip,
 	}
 	tr.Dial = func(network string, address string) (net.Conn, error) {
 		conn, err := net.DialTimeout(network, address, time.Duration(blitz.connectTimeout)*time.Millisecond)
 		if err != nil {
 			return nil, err
 		}
-		conn.SetReadDeadline(time.Now().Add(time.Duration(blitz.readTimeout)*time.Millisecond))
-		conn.SetWriteDeadline(time.Now().Add(time.Duration(blitz.writeTimeout)*time.Millisecond))
+		conn.SetReadDeadline(time.Now().Add(time.Duration(blitz.readTimeout) * time.Millisecond))
+		conn.SetWriteDeadline(time.Now().Add(time.Duration(blitz.writeTimeout) * time.Millisecond))
 
-		bConn := &BlitzConn{Conn: conn, readTimeout: time.Duration(blitz.readTimeout)*time.Millisecond, writeTimeout: time.Duration(blitz.writeTimeout)*time.Millisecond}
+		bConn := &BlitzConn{Conn: conn, readTimeout: time.Duration(blitz.readTimeout) * time.Millisecond, writeTimeout: time.Duration(blitz.writeTimeout) * time.Millisecond}
 		return bConn, nil
 
 	}
@@ -144,12 +146,12 @@ func (blitz *Blitz) raider() {
 			resp.Body.Close()
 		}
 		result = append(result, &blitzResult{
-				statusCode:    code,
-				duration:      time.Now().Sub(s),
-				err:           err,
-				contentLength: size,
-				timestamp:     time.Now(),
-			})
+			statusCode:    code,
+			duration:      time.Now().Sub(s),
+			err:           err,
+			contentLength: size,
+			timestamp:     time.Now(),
+		})
 		if blitz.duration == 0 {
 			blitz.bar.Increment()
 		}
