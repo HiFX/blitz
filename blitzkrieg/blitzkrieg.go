@@ -18,18 +18,42 @@ import (
 // A Blitz contains all the vars to perform the load test
 type Blitz struct {
 	requests       []*blitzRequest      // generated from URL/URLs file
-	loginRequest   *blitzRequest        //Login Request
 	count          int                  //Number of requests
 	clients        int                  //The number of concurrent clients to run
 	duration       int                  // Duration to run the test
 	keepAlive      bool                 //Whether to set KeepAlive ON or NOT
 	connectTimeout int                  //Connect timeout in ms
+	readTimeout    int                  //Read timeout in ms
+	writeTimeout   int                  //Write timeout in ms
 	rate           int                  // Rate limit.
 	header         http.Header          // Http Headers
 	startTime      time.Time            // Start time
 	bar            *pb.ProgressBar      // Progress bar
 	jobs           chan *blitzRequest   //Jobs channel
 	results        chan *[]*blitzResult //Results Channel holds array of blitzResult (size blitz.clients)
+}
+
+
+type BlitzConn struct {
+	net.Conn
+	readTimeout  time.Duration
+	writeTimeout time.Duration
+}
+
+func (blitzConn *BlitzConn) Read(b []byte) (n int, err error) {
+	len, err := blitzConn.Conn.Read(b)
+	if err == nil {
+		blitzConn.Conn.SetReadDeadline(time.Now().Add(blitzConn.readTimeout))
+	}
+	return len, err
+}
+
+func (blitzConn *BlitzConn) Write(b []byte) (n int, err error) {
+	len, err := blitzConn.Conn.Write(b)
+	if err == nil {
+		blitzConn.Conn.SetWriteDeadline(time.Now().Add(blitzConn.writeTimeout))
+	}
+	return len, err
 }
 
 // Run sets up the variables and runs the load test
@@ -55,7 +79,7 @@ func (blitz *Blitz) run() {
 	// Throttle the rate at which requests are sent in the job channel if Rate limiting is applicable
 	var throttler <-chan time.Time
 	if blitz.rate > 0 {
-		throttler = time.Tick(time.Duration(1e6/(blitz.rate)) * time.Microsecond)
+		throttler = time.Tick(time.Duration(1e6/(blitz.rate))*time.Microsecond)
 	}
 	blitz.startTime = time.Now()
 	var waitr sync.WaitGroup
@@ -90,8 +114,17 @@ func (blitz *Blitz) raider() {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
-	tr.Dial = func(network string, address string) (conn net.Conn, err error) {
-		return net.DialTimeout(network, address, time.Duration(blitz.connectTimeout)*time.Millisecond)
+	tr.Dial = func(network string, address string) (net.Conn, error) {
+		conn, err := net.DialTimeout(network, address, time.Duration(blitz.connectTimeout)*time.Millisecond)
+		if err != nil {
+			return nil, err
+		}
+		conn.SetReadDeadline(time.Now().Add(time.Duration(blitz.readTimeout)*time.Millisecond))
+		conn.SetWriteDeadline(time.Now().Add(time.Duration(blitz.writeTimeout)*time.Millisecond))
+
+		bConn := &BlitzConn{Conn: conn, readTimeout: time.Duration(blitz.readTimeout)*time.Millisecond, writeTimeout: time.Duration(blitz.writeTimeout)*time.Millisecond}
+		return bConn, nil
+
 	}
 	client := &http.Client{Transport: tr}
 
@@ -111,12 +144,12 @@ func (blitz *Blitz) raider() {
 			resp.Body.Close()
 		}
 		result = append(result, &blitzResult{
-			statusCode:    code,
-			duration:      time.Now().Sub(s),
-			err:           err,
-			contentLength: size,
-			timestamp:     time.Now(),
-		})
+				statusCode:    code,
+				duration:      time.Now().Sub(s),
+				err:           err,
+				contentLength: size,
+				timestamp:     time.Now(),
+			})
 		if blitz.duration == 0 {
 			blitz.bar.Increment()
 		}

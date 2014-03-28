@@ -30,6 +30,8 @@ var (
 	keepAlive      bool   // Http Keep-alive on/off flag
 	needLogin      bool   // Login on/off flag - if enabled the first url from urlsFilePath is used for login
 	connectTimeout int    // Connect timeout in milliseconds
+	readTimeout	   int	  // Read timeout in milliseconds
+	writeTimeout   int	  // Write timeout in milliseconds
 	showErr        bool   // Show errors
 	outFormat      string // Output Format
 	version        bool   // Display version
@@ -68,8 +70,12 @@ func init() {
 	flag.BoolVar(&needLogin, "login", false, "")
 	flag.BoolVar(&showErr, "e", false, "")
 	flag.BoolVar(&showErr, "err", false, "Display Errors")
-	flag.IntVar(&connectTimeout, "t", 5000, "Connect timeout in ms")
-	flag.IntVar(&connectTimeout, "timeout", 5000, "")
+	flag.IntVar(&connectTimeout, "tc", 5000, "Connect timeout in ms")
+	flag.IntVar(&connectTimeout, "timeoutcon", 5000, "")
+	flag.IntVar(&readTimeout, "tr", 5000, "Connect timeout in ms")
+	flag.IntVar(&readTimeout, "timeoutread", 5000, "")
+	flag.IntVar(&writeTimeout, "tw", 5000, "Connect timeout in ms")
+	flag.IntVar(&writeTimeout, "timeoutwrite", 5000, "")
 	flag.StringVar(&outFormat, "o", "", "")
 	flag.StringVar(&outFormat, "output", "", "Output Format")
 	flag.BoolVar(&version, "v", false, "Prints the version number")
@@ -78,19 +84,21 @@ func init() {
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: blitz [options]\n")
 		fmt.Fprintf(os.Stderr, "Options:\n")
-		fmt.Fprintf(os.Stderr, "-c, -clients     Clients           Number of clients to simulate.\n")
-		fmt.Fprintf(os.Stderr, "-n, -number      Number            Number of requests\n")
-		fmt.Fprintf(os.Stderr, "-d, -duration    Duration          Duration of the test in seconds.\n")
-		fmt.Fprintf(os.Stderr, "-r, -rate        Rate              Rate limit.\n")
-		fmt.Fprintf(os.Stderr, "-u, -url         URL               URL to test.\n")
-		fmt.Fprintf(os.Stderr, "-f, -file        URLs File         URLs file.\n")
-		fmt.Fprintf(os.Stderr, "-k, -keep        KeepAlive         HTTP keep-alive on/off.\n")
-		fmt.Fprintf(os.Stderr, "-l, -login       Login             Do login on/off.\n")
-		fmt.Fprintf(os.Stderr, "-t, -timeout     ConnectTimeout    Connect timeout in ms.\n")
-		fmt.Fprintf(os.Stderr, "-o, -output      OutputFormat      [graph/csv].\n")
-		fmt.Fprintf(os.Stderr, "-e, -err         ShowErr           Display Errors.\n")
-		fmt.Fprintf(os.Stderr, "-v, -version     Version           Prints the version number.\n")
-		fmt.Fprintf(os.Stderr, "-h, -help        Help              Prints this output.\n")
+		fmt.Fprintf(os.Stderr, "-c,  -clients        Clients           Number of clients to simulate[default 100].\n")
+		fmt.Fprintf(os.Stderr, "-n,  -number         Number            Number of requests\n")
+		fmt.Fprintf(os.Stderr, "-d,  -duration       Duration          Duration of the test in seconds.\n")
+		fmt.Fprintf(os.Stderr, "-r,  -rate           Rate              Rate limit.\n")
+		fmt.Fprintf(os.Stderr, "-u,  -url            URL               URL to test.\n")
+		fmt.Fprintf(os.Stderr, "-f,  -file           URLs File         URLs file.\n")
+		fmt.Fprintf(os.Stderr, "-k,  -keep           KeepAlive         HTTP keep-alive on/off [default true].\n")
+		fmt.Fprintf(os.Stderr, "-l,  -login          Login             Do login on/off.\n")
+		fmt.Fprintf(os.Stderr, "-tc, -timeoutcon     ConnectTimeout    Connect timeout in ms [default 5000].\n")
+		fmt.Fprintf(os.Stderr, "-tr, -timeoutread    ReadTimeout       Read timeout in ms [default 5000].\n")
+		fmt.Fprintf(os.Stderr, "-tw, -timeoutwrite   WriteTimeout      Write timeout in ms [default 5000].\n")
+		fmt.Fprintf(os.Stderr, "-o,  -output         OutputFormat      [graph].\n")
+		fmt.Fprintf(os.Stderr, "-e,  -err            ShowErr           Display Errors.\n")
+		fmt.Fprintf(os.Stderr, "-v,  -version        Version           Prints the version number.\n")
+		fmt.Fprintf(os.Stderr, "-h,  -help           Help              Prints this output.\n")
 	}
 }
 
@@ -126,6 +134,8 @@ func NewBlitz() (blitz *Blitz) {
 		clients:        clients,
 		rate:           rate,
 		connectTimeout: connectTimeout,
+		readTimeout: readTimeout,
+		writeTimeout: writeTimeout,
 	}
 	if count != -1 {
 		blitz.count = count
