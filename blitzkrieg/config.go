@@ -14,6 +14,7 @@ import (
 	"runtime"
 	"strings"
 	"time"
+	"strconv"
 )
 
 const (
@@ -210,6 +211,8 @@ func readFile(path string) (requests []*blitzRequest, err error) {
 				req.header = parseHeaders(arr[3])
 				fallthrough
 			case 3:
+				req.header.Add("Content-Type", "application/x-www-form-urlencoded")
+    			req.header.Add("Content-Length", strconv.Itoa(len(arr[2])))
 				req.body = arr[2]
 			}
 		case "GET":
