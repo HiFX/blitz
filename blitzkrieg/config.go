@@ -15,6 +15,8 @@ import (
 	"strings"
 	"time"
 	"strconv"
+	"code.google.com/p/go.net/publicsuffix"
+	"net/http/cookiejar"
 )
 
 const (
@@ -271,17 +273,23 @@ func parseHeaders(headerStr string) (header http.Header) {
 }
 
 func doLogin(req *blitzRequest) ([]*http.Cookie, error) {
+	options := cookiejar.Options{
+		PublicSuffixList: publicsuffix.List,
+	}
+	jar, cerr := cookiejar.New(&options)
+	if cerr != nil {
+		log.Fatal(cerr)
+	}
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
 	tr.Dial = func(network string, address string) (conn net.Conn, err error) {
 		return net.DialTimeout(network, address, time.Duration(connectTimeout)*time.Millisecond)
 	}
-	client := &http.Client{Transport: tr}
+	client := &http.Client{Transport: tr, Jar:jar}
 	resp, err := client.Do(req.getHttpRequest())
 	if resp != nil && err == nil {
 		return resp.Cookies(), nil
 	}
 	return nil, err
-
 }
