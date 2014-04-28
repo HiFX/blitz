@@ -73,7 +73,7 @@ func (blitz *Blitz) report() {
 					errFlag = true
 				} else {
 					report.statusCodes[result.statusCode]++
-					if result.statusCode >= 200 && result.statusCode <= 300 {
+					if result.statusCode >= 200 && result.statusCode <= 302 {
 						report.totalSuccess++
 						errFlag = false
 					} else {

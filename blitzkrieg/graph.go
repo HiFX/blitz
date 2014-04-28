@@ -9,6 +9,7 @@ import (
 	"time"
 )
 
+const NUMPLOTS = 10000
 const plotsTemplate = `
 <html>
 <head>
@@ -48,18 +49,50 @@ Date.ext={};Date.ext.util={};Date.ext.util.xPad=function(a,c,b){if(typeof(b)=="u
 `
 
 func graph(report *report, outStr string) {
+	var (
+		checkPoint        float64
+		counter           int
+		checkPointCounter float64
+		aggGood           float64
+		aggBad            float64
+	)
+	if NUMPLOTS > len(report.graphData) {
+		checkPoint = report.totalTime / NUMPLOTS
+	} else {
+		checkPoint = report.totalTime / float64(len(report.graphData))
+	}
+
+	checkPointCounter = checkPoint
+
 	conf := fmt.Sprintf("[clients:%d / date:%s]", clients, time.Now().Format("2006-01-02 15:04:05"))
 	var buffer bytes.Buffer
 	sort.Sort(graphPlots(report.graphData))
-	for _, val := range report.graphData {
-		buffer.WriteString("[")
-		buffer.WriteString(strconv.FormatFloat(val.elapsed, 'f', 5, 64))
-		buffer.WriteString(",")
-		buffer.WriteString(val.latencySuccess)
-		buffer.WriteString(",")
-		buffer.WriteString(val.latencyErr)
-		buffer.WriteString("], \n")
+
+	val := report.graphData[0]
+MLoop:
+	for checkPointCounter = 0; checkPointCounter < report.totalTime; checkPointCounter += checkPoint {
+		for val.elapsed < checkPointCounter {
+			counter++
+			fs, _ := strconv.ParseFloat(val.latencySuccess, 64)
+			fe, _ := strconv.ParseFloat(val.latencyErr, 64)
+			aggGood += fs
+			aggBad += fe
+
+			if len(report.graphData) == 1 {
+				break MLoop
+			} else {
+				report.graphData = report.graphData[1:]
+			}
+			val = report.graphData[0]
+		}
+		if counter != 0 {
+			plotPoint(&buffer, checkPointCounter, aggGood, aggBad, counter)
+			aggGood = 0
+			aggBad = 0
+			counter = 0
+		}
 	}
+
 	str := fmt.Sprintf(plotsTemplate, dygraphs, buffer.String(), conf, outStr)
 
 	fileName := time.Now().Format("2006-01-02-15-04-05.html")
@@ -77,4 +110,26 @@ func graph(report *report, outStr string) {
 		panic(err)
 	}
 
+}
+
+func plotPoint(buffer *bytes.Buffer, checkPointCounter float64, aggGood float64, aggBad float64, counter int) {
+	var (
+		averageGood float64
+		averageBad  float64
+	)
+	if counter == 0 {
+		averageGood = 0
+		averageBad = 0
+	} else {
+		averageGood = aggGood / float64(counter)
+		averageBad = aggBad / float64(counter)
+	}
+
+	buffer.WriteString("[")
+	buffer.WriteString(strconv.FormatFloat(checkPointCounter, 'f', 5, 64))
+	buffer.WriteString(",")
+	buffer.WriteString(strconv.FormatFloat(averageGood, 'f', 5, 64))
+	buffer.WriteString(",")
+	buffer.WriteString(strconv.FormatFloat(averageBad, 'f', 5, 64))
+	buffer.WriteString("], \n")
 }

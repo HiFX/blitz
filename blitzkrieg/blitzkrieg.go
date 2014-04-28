@@ -128,17 +128,18 @@ func (blitz *Blitz) raider() {
 		return bConn, nil
 
 	}
-	client := &http.Client{Transport: tr}
+	//client := &http.Client{Transport: tr}
 
 	for req := range blitz.jobs {
 		s := time.Now()
-		resp, err := client.Do(req.getHttpRequest())
+		//resp, err := client.Do(req.getHttpRequest())
+		resp, err := tr.RoundTrip(req.getHttpRequest())
 		code := 0
 		var size int64 = 0
 		if resp != nil {
 			code = resp.StatusCode
 			if body, err := ioutil.ReadAll(resp.Body); err == nil {
-				if code >= 200 && code <= 300 {
+				if code >= 200 && code <= 302 {
 					size = int64(len(body))
 				}
 			}
