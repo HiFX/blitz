@@ -57,12 +57,14 @@ func graph(report *report, outStr string) {
 		aggBad            float64
 	)
 	if NUMPLOTS > len(report.graphData) {
-		checkPoint = report.totalTime / NUMPLOTS
-	} else {
 		checkPoint = report.totalTime / float64(len(report.graphData))
+	} else {
+		checkPoint = report.totalTime / NUMPLOTS
 	}
 
 	checkPointCounter = checkPoint
+
+
 
 	conf := fmt.Sprintf("[clients:%d / date:%s]", clients, time.Now().Format("2006-01-02 15:04:05"))
 	var buffer bytes.Buffer
@@ -85,12 +87,12 @@ MLoop:
 			}
 			val = report.graphData[0]
 		}
-		if counter != 0 {
+
 			plotPoint(&buffer, checkPointCounter, aggGood, aggBad, counter)
 			aggGood = 0
 			aggBad = 0
 			counter = 0
-		}
+
 	}
 
 	str := fmt.Sprintf(plotsTemplate, dygraphs, buffer.String(), conf, outStr)
